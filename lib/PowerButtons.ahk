@@ -16,8 +16,12 @@ class PowerButtons {
 
     Disable() {
         if !FileExist(this.StateFile) {
-            for key, value in PowerButtons.Read()
+            ; Remember which scheme the values came from: the user may switch
+            ; plans (or we may crash) before they are restored.
+            scheme := PowerButtons.ActiveSchemeGuid()
+            for key, value in PowerButtons.Read(scheme)
                 IniWrite(value, this.StateFile, "Saved", key)
+            IniWrite(scheme, this.StateFile, "Saved", "Scheme")
         }
         PowerButtons.Write(Map("PowerAC", 0, "PowerDC", 0, "SleepAC", 0, "SleepDC", 0))
     }
@@ -25,67 +29,75 @@ class PowerButtons {
     Restore() {
         if !FileExist(this.StateFile)
             return false
+        scheme := IniRead(this.StateFile, "Saved", "Scheme", "")
         values := Map()
-        for key in PowerButtons.Keys {
-            value := IniRead(this.StateFile, "Saved", key, "")
-            if !IsInteger(value) {
+        for key in PowerButtons.Keys
+            values[key] := IniRead(this.StateFile, "Saved", key, "")
+        ; No Scheme (file from an earlier CatKey): restore to the active scheme
+        validScheme := scheme = "" || RegExMatch(scheme, "i)^\{[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\}$")
+        for key, value in values {
+            if !IsInteger(value) || !validScheme {
                 FileDelete(this.StateFile)
                 return false
             }
             values[key] := Integer(value)
         }
-        PowerButtons.Write(values)
+        PowerButtons.Write(values, scheme)
         FileDelete(this.StateFile)
         return true
     }
 
-    static Read() {
+    ; Returns the active power scheme as "{GUID}".
+    static ActiveSchemeGuid() {
+        r := DllCall("powrprof\PowerGetActiveScheme", "Ptr", 0, "Ptr*", &pScheme := 0, "UInt")
+        if r
+            throw OSError(r, "PowerGetActiveScheme")
+        buf := Buffer(78)
+        DllCall("ole32\StringFromGUID2", "Ptr", pScheme, "Ptr", buf, "Int", 39)
+        DllCall("LocalFree", "Ptr", pScheme)
+        return StrGet(buf, "UTF-16")
+    }
+
+    ; scheme: "{GUID}"; defaults to the active scheme.
+    static Read(scheme := "") {
         values := Map()
-        scheme := PowerButtons._ActiveScheme()
-        try {
-            sub := PowerButtons._Guid(PowerButtons.SubButtons)
-            for name, guid in PowerButtons.Settings {
-                setting := PowerButtons._Guid(guid)
-                for mode in ["AC", "DC"] {
-                    r := DllCall("powrprof\PowerRead" mode "ValueIndex", "Ptr", 0, "Ptr", scheme
-                        , "Ptr", sub, "Ptr", setting, "UInt*", &value := 0, "UInt")
-                    if r
-                        throw OSError(r, "PowerRead" mode "ValueIndex")
-                    values[name mode] := value
-                }
+        schemeBuf := PowerButtons._Guid(scheme = "" ? PowerButtons.ActiveSchemeGuid() : scheme)
+        sub := PowerButtons._Guid(PowerButtons.SubButtons)
+        for name, guid in PowerButtons.Settings {
+            setting := PowerButtons._Guid(guid)
+            for mode in ["AC", "DC"] {
+                r := DllCall("powrprof\PowerRead" mode "ValueIndex", "Ptr", 0, "Ptr", schemeBuf
+                    , "Ptr", sub, "Ptr", setting, "UInt*", &value := 0, "UInt")
+                if r
+                    throw OSError(r, "PowerRead" mode "ValueIndex")
+                values[name mode] := value
             }
-        } finally {
-            DllCall("LocalFree", "Ptr", scheme)
         }
         return values
     }
 
-    static Write(values) {
-        scheme := PowerButtons._ActiveScheme()
-        try {
-            sub := PowerButtons._Guid(PowerButtons.SubButtons)
-            for name, guid in PowerButtons.Settings {
-                setting := PowerButtons._Guid(guid)
-                for mode in ["AC", "DC"] {
-                    r := DllCall("powrprof\PowerWrite" mode "ValueIndex", "Ptr", 0, "Ptr", scheme
-                        , "Ptr", sub, "Ptr", setting, "UInt", values[name mode], "UInt")
-                    if r
-                        throw OSError(r, "PowerWrite" mode "ValueIndex")
-                }
+    ; scheme: "{GUID}"; defaults to the active scheme. Changes take effect
+    ; immediately only when the scheme is the active one.
+    static Write(values, scheme := "") {
+        active := PowerButtons.ActiveSchemeGuid()
+        if scheme = ""
+            scheme := active
+        schemeBuf := PowerButtons._Guid(scheme)
+        sub := PowerButtons._Guid(PowerButtons.SubButtons)
+        for name, guid in PowerButtons.Settings {
+            setting := PowerButtons._Guid(guid)
+            for mode in ["AC", "DC"] {
+                r := DllCall("powrprof\PowerWrite" mode "ValueIndex", "Ptr", 0, "Ptr", schemeBuf
+                    , "Ptr", sub, "Ptr", setting, "UInt", values[name mode], "UInt")
+                if r
+                    throw OSError(r, "PowerWrite" mode "ValueIndex")
             }
-            r := DllCall("powrprof\PowerSetActiveScheme", "Ptr", 0, "Ptr", scheme, "UInt")
+        }
+        if scheme = active {
+            r := DllCall("powrprof\PowerSetActiveScheme", "Ptr", 0, "Ptr", schemeBuf, "UInt")
             if r
                 throw OSError(r, "PowerSetActiveScheme")
-        } finally {
-            DllCall("LocalFree", "Ptr", scheme)
         }
-    }
-
-    static _ActiveScheme() {
-        r := DllCall("powrprof\PowerGetActiveScheme", "Ptr", 0, "Ptr*", &scheme := 0, "UInt")
-        if r
-            throw OSError(r, "PowerGetActiveScheme")
-        return scheme
     }
 
     static _Guid(str) {

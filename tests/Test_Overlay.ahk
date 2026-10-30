@@ -29,6 +29,15 @@ for i, hwnd in ov.Hwnds {
     AssertEq(ControlGetText("Static1", "ahk_id " hwnd), "CatKey locked", "window " i " shows text")
 }
 
+; The overlay takes focus so keys/wheel can't reach (possibly elevated) windows underneath
+AssertTrue(WinActive("ahk_id " ov.Hwnds[1]), "Show activates the overlay")
+focusThief := Gui()
+focusThief.Show("w100 h100")
+WinWaitActive("ahk_id " focusThief.Hwnd, , 1)
+ov.KeepOnTop()
+AssertTrue(WinActive("ahk_id " ov.Hwnds[1]), "KeepOnTop takes focus back")
+focusThief.Destroy()
+
 ; A single click does nothing
 PostMessage(WM_LBUTTONDOWN, 1, 0, , "ahk_id " ov.Hwnds[1])
 Sleep(100)

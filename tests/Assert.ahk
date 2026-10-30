@@ -1,7 +1,11 @@
 #Requires AutoHotkey v2.0
+#SingleInstance Off
 
 ; Minimal assertion helpers. Results go to stdout; Done() sets the exit code.
 global Failures := 0
+
+; Unhandled errors print and exit instead of showing a blocking dialog
+OnError((e, *) => (FileAppend("ERROR " e.Message " (line " e.Line ")`n", "*"), ExitApp(2)))
 
 AssertEq(actual, expected, name) {
     global Failures

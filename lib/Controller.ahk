@@ -27,7 +27,21 @@ class CatKeyController {
             return
         this.Locked := true
         this.KeyBlock.Start()
-        this.Overlay.Show()
+        shown := false
+        try {
+            this.Overlay.Show()
+            shown := this.Overlay.IsShown
+        } catch as e {
+            this.LastError := e.Message
+        }
+        ; No (complete) overlay means nothing reliable to double-click: don't
+        ; leave the keyboard blocked
+        if !shown {
+            this.Overlay.Hide()
+            this.KeyBlock.Stop()
+            this.Locked := false
+            return
+        }
         try {
             this.PowerButtons.Disable()
         } catch as e {

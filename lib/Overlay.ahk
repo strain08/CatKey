@@ -27,6 +27,7 @@ class Overlay {
     Show() {
         if this.IsShown
             return
+        OnMessage(Overlay.WM_LBUTTONDBLCLK, this._onDblClick)
         Loop MonitorGetCount() {
             MonitorGet(A_Index, &left, &top, &right, &bottom)
             w := right - left, h := bottom - top
@@ -39,13 +40,13 @@ class Overlay {
             WinSetTransparent(this.Opacity, "ahk_id " g.Hwnd)
             this._guis.Push(g)
         }
-        OnMessage(Overlay.WM_LBUTTONDBLCLK, this._onDblClick)
+        this._TakeFocus()
     }
 
     Hide() {
+        OnMessage(Overlay.WM_LBUTTONDBLCLK, this._onDblClick, 0)
         if !this.IsShown
             return
-        OnMessage(Overlay.WM_LBUTTONDBLCLK, this._onDblClick, 0)
         for g in this._guis
             g.Destroy()
         this._guis := []
@@ -54,6 +55,15 @@ class Overlay {
     KeepOnTop() {
         for g in this._guis
             WinSetAlwaysOnTop(1, "ahk_id " g.Hwnd)
+        this._TakeFocus()
+    }
+
+    ; Keystrokes from a non-elevated hook can't be swallowed for an elevated
+    ; foreground window, and the wheel goes to the focused window, so the
+    ; overlay keeps focus while shown.
+    _TakeFocus() {
+        if this.IsShown && !WinActive("ahk_id " this._guis[1].Hwnd)
+            WinActivate("ahk_id " this._guis[1].Hwnd)
     }
 
     _HandleDblClick(wParam, lParam, msg, hwnd) {

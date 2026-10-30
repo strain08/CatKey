@@ -15,8 +15,18 @@ ResetLog() => Calls.Length := 0
 
 class FakeOverlay {
     OnUnlock := ""
-    Show() => Calls.Push("overlay.Show")
-    Hide() => Calls.Push("overlay.Hide")
+    IsShown := false
+    ShowFails := ""  ; "", "throw" or "empty" (no monitors)
+    Show() {
+        Calls.Push("overlay.Show")
+        if this.ShowFails = "throw"
+            throw Error("monitor gone")
+        this.IsShown := this.ShowFails != "empty"
+    }
+    Hide() {
+        Calls.Push("overlay.Hide")
+        this.IsShown := false
+    }
     KeepOnTop() => Calls.Push("overlay.KeepOnTop")
 }
 
@@ -99,6 +109,16 @@ pw.ShouldThrow := false
 ResetLog()
 c.RecoverFromCrash()
 AssertEq(LogText(), "power.Restore", "RecoverFromCrash restores")
+
+; Overlay failure must not leave the keyboard blocked with nothing to double-click
+for mode in ["throw", "empty"] {
+    ov.ShowFails := mode
+    ResetLog()
+    c.Lock()
+    AssertEq(c.Locked, false, "overlay " mode ": lock rolled back")
+    AssertEq(LogText(), "keys.Start,overlay.Show,overlay.Hide,keys.Stop", "overlay " mode ": keys released, power untouched")
+}
+ov.ShowFails := ""
 
 ; Shutdown while locked unlocks; while unlocked does nothing
 c.Lock()
