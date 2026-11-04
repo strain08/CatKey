@@ -28,7 +28,21 @@ A_TrayMenu.Add("Pause CatKey", TogglePause)
 A_TrayMenu.Add()
 A_TrayMenu.Add("Exit", (*) => ExitApp())
 
+; Release the keyboard when Windows locks (Win+L, sleep, timeout) so the PIN
+; can be typed on the lock screen
+WM_WTSSESSION_CHANGE := 0x2B1, WTS_SESSION_LOCK := 7, WTS_SESSION_UNLOCK := 8
+DllCall("Wtsapi32\WTSRegisterSessionNotification", "Ptr", A_ScriptHwnd, "UInt", 0)
+OnMessage(WM_WTSSESSION_CHANGE, OnSessionChange)
+OnExit((*) => DllCall("Wtsapi32\WTSUnRegisterSessionNotification", "Ptr", A_ScriptHwnd))
+
 SetTimer(() => ctrl.Tick(A_TimeIdlePhysical), 1000)
+
+OnSessionChange(wParam, *) {
+    if wParam = WTS_SESSION_LOCK
+        ctrl.OnSessionLock()
+    else if wParam = WTS_SESSION_UNLOCK
+        ctrl.OnSessionUnlock()
+}
 
 TogglePause(itemName, *) {
     if ctrl.TogglePause()

@@ -129,4 +129,41 @@ ResetLog()
 c.Shutdown()
 AssertEq(LogText(), "", "Shutdown when unlocked does nothing")
 
+; Windows session lock releases CatKey so the PIN can be typed
+global FakeNow := 1000000
+c.Now := () => FakeNow
+c.Lock()
+ResetLog()
+c.OnSessionLock()
+AssertEq(LogText(), "overlay.Hide,keys.Stop,power.Restore", "session lock releases CatKey")
+AssertEq(c.Locked, false, "unlocked by session lock")
+
+; While the session is locked, idle never locks
+ResetLog()
+c.Tick(999999)
+AssertEq(LogText(), "", "no lock while session locked")
+c.OnSessionLock()
+AssertEq(LogText(), "", "repeated session lock does nothing")
+
+; After session unlock, idle counts from the unlock, not from before the lock
+FakeNow += 600000
+c.OnSessionUnlock()
+c.Tick(999999)
+AssertEq(c.Locked, false, "idle before session unlock ignored")
+FakeNow += 299999
+c.Tick(999999)
+AssertEq(c.Locked, false, "still below timeout since session unlock")
+FakeNow += 1
+c.Tick(999999)
+AssertEq(c.Locked, true, "locks at timeout since session unlock")
+c.Unlock()
+
+; Real input after the unlock is measured normally
+FakeNow += 600000
+c.Tick(1000)
+AssertEq(c.Locked, false, "recent input keeps unlocked")
+c.Tick(300000)
+AssertEq(c.Locked, true, "locks on real idle after session unlock")
+c.Unlock()
+
 Done()
