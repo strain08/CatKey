@@ -21,6 +21,8 @@ ctrl := CatKeyController(IdleTimeoutMin * 60000, Overlay(), KeyBlock()
 ctrl.RecoverFromCrash()
 OnExit((*) => ctrl.Shutdown())
 
+if FileExist(A_ScriptDir "\CatKey.ico")
+    TraySetIcon(A_ScriptDir "\CatKey.ico")
 A_IconTip := "CatKey"
 A_TrayMenu.Delete()
 A_TrayMenu.Add("Lock now", (*) => ctrl.Lock())
