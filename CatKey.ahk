@@ -2,11 +2,11 @@
 #SingleInstance Force
 
 ; CatKey: locks the keyboard after a period of no input so a cat can't type.
-; The screens dim with "CatKey locked"; double-click anywhere to unlock.
+; The screens dim with a message; double-click anywhere to unlock.
 ; While locked the power and sleep buttons do nothing. Ctrl+Alt+Del always works.
+; Settings live in CatKey.ini, created with defaults on first run.
 
-IdleTimeoutMin := 5
-
+#Include %A_ScriptDir%\lib\Settings.ahk
 #Include %A_ScriptDir%\lib\PowerButtons.ahk
 #Include %A_ScriptDir%\lib\KeyBlock.ahk
 #Include %A_ScriptDir%\lib\Overlay.ahk
@@ -16,7 +16,8 @@ IdleTimeoutMin := 5
 InstallKeybdHook()
 InstallMouseHook()
 
-ctrl := CatKeyController(IdleTimeoutMin * 60000, Overlay(), KeyBlock()
+cfg := Settings(A_ScriptDir "\CatKey.ini")
+ctrl := CatKeyController(cfg.IdleTimeoutMin * 60000, Overlay(cfg.OverlayText), KeyBlock()
     , PowerButtons(A_ScriptDir "\CatKey.state"))
 ctrl.RecoverFromCrash()
 OnExit((*) => ctrl.Shutdown())
