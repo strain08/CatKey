@@ -36,7 +36,7 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 WM_WTSSESSION_CHANGE := 0x2B1, WTS_SESSION_LOCK := 7, WTS_SESSION_UNLOCK := 8
 DllCall("Wtsapi32\WTSRegisterSessionNotification", "Ptr", A_ScriptHwnd, "UInt", 0)
 OnMessage(WM_WTSSESSION_CHANGE, OnSessionChange)
-OnExit((*) => DllCall("Wtsapi32\WTSUnRegisterSessionNotification", "Ptr", A_ScriptHwnd))
+OnExit(UnregisterSessionNotification)
 
 SetTimer(() => ctrl.Tick(A_TimeIdlePhysical), 1000)
 
@@ -45,6 +45,11 @@ OnSessionChange(wParam, *) {
         ctrl.OnSessionLock()
     else if wParam = WTS_SESSION_UNLOCK
         ctrl.OnSessionUnlock()
+}
+
+; Must not return a value: a non-zero return from an OnExit callback cancels the exit
+UnregisterSessionNotification(*) {
+    DllCall("Wtsapi32\WTSUnRegisterSessionNotification", "Ptr", A_ScriptHwnd)
 }
 
 TogglePause(itemName, *) {
