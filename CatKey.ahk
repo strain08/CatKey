@@ -11,6 +11,7 @@
 #Include %A_ScriptDir%\lib\KeyBlock.ahk
 #Include %A_ScriptDir%\lib\Overlay.ahk
 #Include %A_ScriptDir%\lib\Controller.ahk
+#Include %A_ScriptDir%\lib\Autostart.ahk
 
 ; Hooks make A_TimeIdlePhysical ignore simulated input
 InstallKeybdHook()
@@ -28,6 +29,11 @@ A_IconTip := "CatKey"
 A_TrayMenu.Delete()
 A_TrayMenu.Add("Lock now", (*) => ctrl.Lock())
 A_TrayMenu.Add("Pause CatKey", TogglePause)
+A_TrayMenu.Add()
+startup := Autostart()
+A_TrayMenu.Add("Run at startup", ToggleAutostart)
+if startup.IsEnabled()
+    A_TrayMenu.Check("Run at startup")
 A_TrayMenu.Add()
 A_TrayMenu.Add("Exit", (*) => ExitApp())
 
@@ -54,6 +60,18 @@ UnregisterSessionNotification(*) {
 
 TogglePause(itemName, *) {
     if ctrl.TogglePause()
+        A_TrayMenu.Check(itemName)
+    else
+        A_TrayMenu.Uncheck(itemName)
+}
+
+ToggleAutostart(itemName, *) {
+    try enabled := startup.Toggle()
+    catch as e {
+        MsgBox("Couldn't change the startup setting:`n" e.Message, "CatKey", "Icon!")
+        return
+    }
+    if enabled
         A_TrayMenu.Check(itemName)
     else
         A_TrayMenu.Uncheck(itemName)
